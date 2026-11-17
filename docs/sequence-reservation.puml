@@ -1,0 +1,68 @@
+
+@startuml
+title Diagramme de séquence - UC2 : Réserver un rendez-vous
+
+autonumber
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor Patient
+participant "AppointmentsController" as Controller
+participant "AppointmentsService" as Service
+participant "AppointmentRepository" as Repository
+participant "Service de notification" as Notification
+
+== Scénario nominal ==
+
+Patient -> Controller : reserverRendezVous(patientId, slotId)
+activate Controller
+
+Controller -> Service : reserver(patientId, slotId)
+activate Service
+
+Service -> Repository : getSlot(slotId)
+activate Repository
+Repository --> Service : creneau
+deactivate Repository
+
+Service -> Repository : verifier et creerReservation()\n(transaction atomique)
+activate Repository
+
+alt Créneau disponible
+    Repository -> Repository : Vérifier unicité du créneau
+    Repository -> Repository : Créer le rendez-vous
+    Repository --> Service : rendezVous(CONFIRMED)
+    deactivate Repository
+
+    Service -> Notification : envoyerConfirmation(rendezVous)
+    activate Notification
+
+    alt Notification envoyée
+        Notification --> Service : confirmation envoyée
+    else Service de notification indisponible
+        Notification --> Service : échec d'envoi
+        Service -> Service : Marquer notification à réessayer
+    end
+    deactivate Notification
+
+    Service --> Controller : réservation confirmée
+    Controller --> Patient : Afficher confirmation
+
+else Créneau déjà réservé
+    Repository --> Service : conflit de réservation
+    deactivate Repository
+    Service --> Controller : réservation refusée
+    Controller --> Patient : Afficher créneau indisponible
+
+else Erreur de sauvegarde
+    Repository --> Service : erreur de sauvegarde
+    deactivate Repository
+    Service --> Controller : échec de réservation
+    Controller --> Patient : Afficher message d'erreur
+end
+
+deactivate Service
+deactivate Controller
+
+@enduml

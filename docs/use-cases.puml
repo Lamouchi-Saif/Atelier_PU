@@ -1,0 +1,59 @@
+@startuml
+!theme aws-orange
+left to right direction
+
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam actorStyle awesome
+
+title Diagramme de cas d'utilisation\nGestion de rendez-vous médicaux
+
+actor Patient
+actor "Médecin" as Medecin
+actor "Administrateur" as Admin
+actor "Service de notification\n(externe)" as Notification
+
+rectangle "Système de gestion de rendez-vous médicaux" {
+
+    usecase "UC1 - Consulter les\ndisponibilités" as UC1
+
+    usecase "UC2 - Réserver un\nrendez-vous" as UC2
+
+    usecase "UC3 - Annuler un\nrendez-vous" as UC3
+
+    usecase "UC4 - Gérer les\ndisponibilités" as UC4
+
+    usecase "UC5 - Consulter le\nplanning" as UC5
+
+    usecase "UC6 - Envoyer une\nnotification" as UC6
+}
+
+' Associations Patient
+Patient --> UC1
+Patient --> UC2
+Patient --> UC3
+
+' Associations Médecin
+Medecin --> UC4
+Medecin --> UC5
+
+' Association du service externe
+Notification --> UC6
+
+' Relations entre cas d'utilisation
+UC2 ..> UC6 : <<include>>
+UC3 ..> UC6 : <<include>>
+
+note right of UC2
+  UC prioritaire à risque :
+  conflits de réservation
+  et double réservation.
+end note
+
+note bottom of Admin
+  Gestion des comptes et des
+  informations de référence :
+  fonctionnalité à préciser
+  dans les UC du projet.
+end note
+@enduml

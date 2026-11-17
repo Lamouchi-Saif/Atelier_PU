@@ -1,0 +1,140 @@
+
+@startuml
+title Diagramme de classes\nGestion de rendez-vous médicaux
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype ortho
+
+' =========================
+' ENUMERATIONS
+' =========================
+
+enum StatutRendezVous {
+    CONFIRMED
+    CANCELLED
+}
+
+enum StatutNotification {
+    PENDING
+    SENT
+    FAILED
+}
+
+' =========================
+' CLASSES METIER
+' =========================
+
+package "Domaine métier" {
+
+    class Patient {
+        - id : int
+        - nom : String
+        - prenom : String
+        - email : String
+        - telephone : String
+        --
+        + consulterDisponibilites()
+        + reserverRendezVous()
+        + annulerRendezVous()
+    }
+
+    class Medecin {
+        - id : int
+        - nom : String
+        - prenom : String
+        - specialite : String
+        - email : String
+        --
+        + gererDisponibilites()
+        + consulterPlanning()
+    }
+
+    class Creneau {
+        - id : int
+        - dateHeureDebut : DateTime
+        - dateHeureFin : DateTime
+        - disponible : Boolean
+        --
+        + verifierDisponibilite() : Boolean
+        + liberer()
+    }
+
+    class RendezVous {
+        - id : int
+        - dateCreation : DateTime
+        - statut : StatutRendezVous
+        --
+        + confirmer()
+        + annuler()
+    }
+
+    class Notification {
+        - id : int
+        - destinataire : String
+        - message : String
+        - dateEnvoi : DateTime
+        - statut : StatutNotification
+        --
+        + envoyer()
+        + reessayer()
+    }
+}
+
+' =========================
+' COUCHE APPLICATION
+' =========================
+
+package "Couche application" {
+
+    class AppointmentsController {
+        + consulterDisponibilites()
+        + reserverRendezVous()
+        + annulerRendezVous()
+        + consulterPlanning()
+    }
+
+    class AppointmentsService {
+        + consulterDisponibilites()
+        + reserver(patientId, slotId)
+        + annuler(appointmentId)
+        + gererDisponibilites()
+        + consulterPlanning()
+    }
+
+    class AppointmentRepository {
+        + getSlot(slotId) : Creneau
+        + isAlreadyBooked(slotId) : Boolean
+        + createAppointment() : RendezVous
+        + findAppointment(id) : RendezVous
+        + save(appointment)
+    }
+
+    class NotificationService <<external>> {
+        + envoyerConfirmation(rdv)
+        + envoyerAnnulation(rdv)
+        + traiterNouvelEssai(notification)
+    }
+}
+
+' =========================
+' RELATIONS METIER
+' =========================
+
+Medecin "1" -- "0..*" Creneau : définit
+Patient "1" -- "0..*" RendezVous : effectue
+Creneau "1" -- "0..1" RendezVous : réservé pour
+RendezVous "1" -- "0..*" Notification : génère
+
+RendezVous --> StatutRendezVous
+Notification --> StatutNotification
+
+' =========================
+' RELATIONS ARCHITECTURE
+' =========================
+
+AppointmentsController --> AppointmentsService : utilise
+AppointmentsService --> AppointmentRepository : utilise
+AppointmentsService --> NotificationService : demande l'envoi
+
+@enduml
