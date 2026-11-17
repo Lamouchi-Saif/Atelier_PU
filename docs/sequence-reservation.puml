@@ -1,68 +1,80 @@
 
 @startuml
+!theme aws-orange
+autonumber
+
 title Diagramme de séquence - UC2 : Réserver un rendez-vous
 
-autonumber
-skinparam shadowing false
-skinparam sequenceMessageAlign center
-skinparam responseMessageBelowArrow true
-
 actor Patient
-participant "AppointmentsController" as Controller
-participant "AppointmentsService" as Service
-participant "AppointmentRepository" as Repository
-participant "Service de notification" as Notification
+participant "Angular Frontend" as Frontend
+participant "AppointmentsController\n(NestJS)" as Controller
+participant "AppointmentsService\n(NestJS)" as Service
+participant "AppointmentRepository\n(TypeORM)" as Repository
+database "MySQL Database" as DB
+participant "NotificationService" as Notification
+participant "External Notification\nProvider" as Provider
 
-== Scénario nominal ==
+Patient -> Frontend : Sélectionner un créneau
+Frontend -> Controller : POST /appointments\n(données du rendez-vous)
+Controller -> Service : reserveAppointment(data)
 
-Patient -> Controller : reserverRendezVous(patientId, slotId)
-activate Controller
+Service -> Repository : Vérifier et enregistrer\nle rendez-vous
+Repository -> DB : Démarrer une transaction
 
-Controller -> Service : reserver(patientId, slotId)
-activate Service
+Repository -> DB : Vérifier l'existence du créneau
+DB --> Repository : Résultat de la vérification
 
-Service -> Repository : getSlot(slotId)
-activate Repository
-Repository --> Service : creneau
-deactivate Repository
+alt Créneau inexistant ou indisponible
+    Repository -> DB : Annuler la transaction
+    Repository --> Service : Réservation refusée
+    Service --> Controller : Erreur métier
+    Controller --> Frontend : HTTP 409 / 404
+    Frontend --> Patient : Afficher un message d'erreur\net proposer d'autres créneaux
 
-Service -> Repository : verifier et creerReservation()\n(transaction atomique)
-activate Repository
+else Créneau disponible
+    Repository -> DB : Insérer le rendez-vous\n(contrainte d'unicité)
+    
+    alt Enregistrement réussi
+        DB --> Repository : Insertion réussie
+        Repository -> DB : Valider la transaction
+        Repository --> Service : Rendez-vous enregistré
 
-alt Créneau disponible
-    Repository -> Repository : Vérifier unicité du créneau
-    Repository -> Repository : Créer le rendez-vous
-    Repository --> Service : rendezVous(CONFIRMED)
-    deactivate Repository
+        Service -> Notification : Envoyer confirmation
+        Notification -> Provider : Appel API de notification
 
-    Service -> Notification : envoyerConfirmation(rendezVous)
-    activate Notification
+        alt Notification envoyée
+            Provider --> Notification : Confirmation d'envoi
+            Notification --> Service : Notification envoyée
+        else Service externe indisponible
+            Provider --> Notification : Erreur d'envoi
+            Notification -> DB : Enregistrer notification\navec statut PENDING
+            Notification --> Service : Notification à réessayer
+        end
 
-    alt Notification envoyée
-        Notification --> Service : confirmation envoyée
-    else Service de notification indisponible
-        Notification --> Service : échec d'envoi
-        Service -> Service : Marquer notification à réessayer
+        Service --> Controller : Réservation confirmée
+        Controller --> Frontend : HTTP 201 Created
+        Frontend --> Patient : Afficher la confirmation
+
+    else Conflit ou erreur d'enregistrement
+        DB --> Repository : Erreur SQL
+        Repository -> DB : Annuler la transaction
+        Repository --> Service : Échec de réservation
+        Service --> Controller : Erreur contrôlée
+        Controller --> Frontend : HTTP 409 / 500
+        Frontend --> Patient : Afficher un message d'échec
     end
-    deactivate Notification
-
-    Service --> Controller : réservation confirmée
-    Controller --> Patient : Afficher confirmation
-
-else Créneau déjà réservé
-    Repository --> Service : conflit de réservation
-    deactivate Repository
-    Service --> Controller : réservation refusée
-    Controller --> Patient : Afficher créneau indisponible
-
-else Erreur de sauvegarde
-    Repository --> Service : erreur de sauvegarde
-    deactivate Repository
-    Service --> Controller : échec de réservation
-    Controller --> Patient : Afficher message d'erreur
 end
 
-deactivate Service
-deactivate Controller
+note over Repository,DB
+  La transaction et la contrainte d'unicité
+  empêchent les doubles réservations,
+  y compris en cas de requêtes simultanées.
+end note
+
+note over Notification,Provider
+  Une erreur de notification ne doit pas
+  annuler une réservation déjà enregistrée.
+  La notification pourra être réessayée.
+end note
 
 @enduml
