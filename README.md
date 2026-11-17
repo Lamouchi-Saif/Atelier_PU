@@ -24,7 +24,8 @@ Le projet met particulièrement l'accent sur :
 - La modélisation des besoins à travers les cas d'utilisation.
 - La gestion précoce des risques techniques.
 - La conception d'une architecture logicielle en couches.
-- La vérification des fonctionnalités par des tests.
+- La séparation des responsabilités entre frontend, backend et base de données.
+- La vérification des fonctionnalités par des tests automatisés.
 - La gestion du développement à travers Git et GitHub.
 
 ## 🎯 2. Objectifs du système
@@ -37,6 +38,7 @@ Le système doit permettre de :
 - Assurer la cohérence des plannings.
 - Informer les patients des confirmations et des annulations.
 - Garantir la fiabilité des opérations de réservation.
+- Proposer une interface adaptée aux patients, médecins et administrateurs.
 
 ## 👥 3. Acteurs du système
 
@@ -76,51 +78,139 @@ La solution doit garantir :
 - Une contrainte d'unicité au niveau de la base de données.
 - Une gestion contrôlée des erreurs.
 
-Une indisponibilité du service de notification ne doit pas entraîner une deuxième réservation ni compromettre la cohérence des données.
+Une indisponibilité du service de notification ne doit pas entraîner une deuxième réservation ni compromettre la cohérence des données. La notification doit pouvoir être réessayée indépendamment de la réservation.
 
 ## 🏗️ 5. Architecture logicielle
 
-Le système adopte une architecture en trois couches afin de séparer les responsabilités.
+Le système adopte une architecture en couches avec une séparation entre le frontend, le backend et la couche de persistance.
+
+### 5.1 Architecture technologique
+
+La solution repose sur les technologies suivantes :
+
+| Composant            | Technologie          | Responsabilité                                  |
+| -------------------- | -------------------- | ----------------------------------------------- |
+| Frontend             | Angular + TypeScript | Interface utilisateur et interactions.          |
+| Backend              | NestJS + TypeScript  | API REST et logique métier.                     |
+| ORM                  | TypeORM              | Mapping objet-relationnel et accès aux données. |
+| Base de données      | MySQL                | Stockage persistant des données.                |
+| Tests backend        | Jest + Supertest     | Tests unitaires et d'intégration.               |
+| Documentation API    | Swagger / OpenAPI    | Documentation des endpoints REST.               |
+| Intégration continue | GitHub Actions       | Exécution automatisée des tests.                |
+
+### 5.2 Architecture globale
 
 ```text
-             Client / Requête HTTP
-                      |
-                      v
-          +-------------------------+
-          |   Presentation Layer   |
-          |    Appointments        |
-          |      Controller        |
-          +-------------------------+
-                      |
-                      v
-          +-------------------------+
-          |     Business Layer     |
-          |   AppointmentsService  |
-          |                         |
-          |  - Business Rules      |
-          |  - Booking Validation  |
-          |  - Conflict Management |
-          +-------------------------+
-                      |
-                      v
-          +-------------------------+
-          |       Data Layer       |
-          |  AppointmentRepository|
-          +-------------------------+
-                      |
-                      v
-               +-------------+
-               |  Database   |
-               +-------------+
+             UTILISATEURS
+       Patient / Médecin / Admin
+                    |
+                    v
+        +-------------------------+
+        |    FRONTEND ANGULAR     |
+        |-------------------------|
+        | Components              |
+        | Pages / Routing         |
+        | Angular Services        |
+        | Forms / Validation      |
+        +-------------------------+
+                    |
+                    | HTTP / REST API
+                    v
+        +-------------------------+
+        |     BACKEND NESTJS      |
+        |-------------------------|
+        | Controllers             |
+        | Services métier         |
+        | Repositories            |
+        | Validation              |
+        +-------------------------+
+                    |
+                    v
+        +-------------------------+
+        |         TYPEORM         |
+        |-------------------------|
+        | Entities                |
+        | Repositories             |
+        | Transactions            |
+        | Migrations              |
+        +-------------------------+
+                    |
+                    v
+        +-------------------------+
+        |          MYSQL          |
+        |-------------------------|
+        | Patients                |
+        | Médecins                |
+        | Créneaux                |
+        | Rendez-vous             |
+        | Notifications           |
+        +-------------------------+
+
+             SERVICE EXTERNE
+             DE NOTIFICATION
 ```
 
-**Responsabilités des couches :**
+### 5.3 Architecture backend en couches
 
-- **Couche présentation :** réception des requêtes et gestion des réponses.
-- **Couche métier :** application des règles de gestion et contrôle des conflits.
-- **Couche d'accès aux données :** lecture, écriture et persistance des rendez-vous.
+Le backend NestJS est organisé autour de trois couches principales :
 
-Cette séparation facilite la maintenance, les tests et l'évolution du système.
+**1. Couche présentation — Controllers**
+
+- Réception des requêtes HTTP provenant du frontend Angular.
+- Validation des paramètres et des données reçues.
+- Appel des services métier.
+- Retour des réponses HTTP appropriées.
+
+Exemple : `AppointmentsController`.
+
+**2. Couche métier — Services**
+
+- Application des règles métier.
+- Vérification de la disponibilité des créneaux.
+- Gestion des réservations et des annulations.
+- Contrôle des conflits.
+- Coordination des opérations de réservation et des notifications.
+
+Exemple : `AppointmentsService`.
+
+**3. Couche d'accès aux données — Repositories**
+
+- Communication avec la base de données à travers TypeORM.
+- Lecture et écriture des rendez-vous.
+- Gestion des entités et des relations.
+- Exécution des opérations transactionnelles.
+
+Exemple : `AppointmentRepository`.
+
+### 5.4 Architecture frontend
+
+Le frontend Angular est organisé en fonctionnalités afin de séparer les composants réutilisables et les fonctionnalités métier.
+
+Les principales responsabilités sont :
+
+- **Components :** affichage des interfaces et interactions utilisateur.
+- **Services :** communication avec l'API REST NestJS.
+- **Routing :** navigation entre les différentes pages.
+- **Forms :** saisie et validation des données.
+- **Core :** services et fonctionnalités globales.
+- **Shared :** composants et éléments réutilisables.
+
+### 5.5 Gestion du risque technique : double réservation
+
+Le risque majeur est que deux patients tentent de réserver simultanément le même créneau.
+
+Une simple vérification de disponibilité dans Angular ou dans le service métier ne suffit pas.
+
+La protection doit être assurée côté backend et renforcée au niveau de MySQL.
+
+Les mécanismes prévus sont :
+
+- Vérification de disponibilité côté NestJS.
+- Utilisation de transactions avec TypeORM.
+- Contrainte d'unicité appropriée dans MySQL.
+- Gestion des conflits et des erreurs de concurrence.
+
+La vérification et l'enregistrement de la réservation doivent être réalisés de manière atomique afin d'empêcher deux patients de réserver le même créneau.
 
 ## 🔄 6. Méthodologie : Processus Unifié
 
@@ -142,6 +232,7 @@ Le projet est organisé en trois itérations.
 - UC1 : Consulter les disponibilités.
 - UC2 : Réserver un rendez-vous.
 - Mise en place du modèle de données.
+- Mise en place de l'architecture Angular / NestJS / TypeORM / MySQL.
 - Architecture de base exécutable.
 - Premier test de réservation et détection des conflits.
 
@@ -193,10 +284,12 @@ La qualité du système sera vérifiée à travers plusieurs niveaux de tests.
 
 **Types de tests prévus :**
 
-- Tests unitaires : validation des règles métier.
-- Tests d'intégration : vérification des interactions entre contrôleur, service et accès aux données.
-- Tests de non-régression : vérification des fonctionnalités existantes après modification.
-- Intégration continue (CI) : exécution automatisée des tests lors des changements du code.
+- **Tests unitaires :** validation des règles métier dans les services NestJS.
+- **Tests d'intégration :** vérification des interactions entre contrôleurs, services, repositories et base de données.
+- **Tests API :** vérification des endpoints REST avec Supertest.
+- **Tests frontend :** vérification des composants et services Angular.
+- **Tests de non-régression :** vérification des fonctionnalités existantes après modification.
+- **Intégration continue (CI) :** exécution automatisée des tests lors des changements du code.
 
 Les résultats des tests seront documentés après leur exécution réelle.
 
@@ -209,27 +302,49 @@ Atelier_PU/
 │
 ├── README.md
 │
+├── frontend/                         # Application Angular
+│   ├── src/
+│   │   └── app/
+│   │       ├── core/
+│   │       ├── shared/
+│   │       ├── features/
+│   │       │   ├── appointments/
+│   │       │   ├── availability/
+│   │       │   ├── patients/
+│   │       │   ├── doctors/
+│   │       │   └── admin/
+│   │       └── app.routes.ts
+│   └── package.json
+│
+├── backend/                          # API NestJS
+│   ├── src/
+│   │   ├── appointments/
+│   │   │   ├── appointments.controller.ts
+│   │   │   ├── appointments.service.ts
+│   │   │   ├── appointments.module.ts
+│   │   │   └── repositories/
+│   │   ├── patients/
+│   │   ├── doctors/
+│   │   ├── availability/
+│   │   ├── notifications/
+│   │   ├── app.module.ts
+│   │   └── main.ts
+│   │
+│   ├── test/
+│   └── package.json
+│
 ├── docs/
 │   ├── compte-rendu.pdf
 │   ├── use-cases.puml
 │   ├── class-diagram.puml
 │   └── sequence-reservation.puml
 │
-├── src/
-│   ├── controllers/
-│   ├── services/
-│   └── repositories/
-│
-├── tests/
-│   ├── unit/
-│   └── integration/
-│
 └── .github/
     └── workflows/
         └── tests.yml
 ```
 
-Cette organisation pourra être adaptée à la technologie retenue pour l'implémentation.
+Cette structure constitue une organisation cible. Les fichiers et dossiers seront ajoutés progressivement au cours de l'implémentation.
 
 ## 🌿 10. Gestion de versions et workflow Git
 
@@ -237,22 +352,24 @@ Le développement est organisé autour de branches fonctionnelles et de jalons.
 
 ### Convention de nommage des branches
 
+Chaque cas d'utilisation dispose de sa propre branche créée à partir de `main`.
+
 ```text
 main
 │
-├── feature/UC1-disponibilites
-├── feature/UC2-reservation
-├── feature/UC3-annulation
-├── feature/UC4-gestion-disponibilites
-├── feature/UC5-planning
-└── feature/UC6-notifications
+├── feature/UC1-consulter-disponibilites
+├── feature/UC2-reserver-rendez-vous
+├── feature/UC3-annuler-rendez-vous
+├── feature/UC4-gerer-disponibilites
+├── feature/UC5-consulter-planning
+└── feature/UC6-envoyer-notification
 ```
 
 ### Workflow de développement
 
 1. Créer une issue GitHub correspondant au cas d'utilisation.
 2. Définir sa priorité et ses critères d'acceptation.
-3. Créer une branche dédiée.
+3. Créer ou utiliser la branche dédiée.
 4. Développer la fonctionnalité.
 5. Ajouter et exécuter les tests correspondants.
 6. Soumettre une Pull Request.
@@ -286,19 +403,22 @@ Le projet évolue progressivement conformément aux phases et aux itérations du
 
 Les livrables sont considérés comme terminés uniquement après leur réalisation et leur vérification.
 
-| Livrable                                | État       |
-| --------------------------------------- | ---------- |
-| Définition de la vision et du périmètre | Conçu      |
-| Identification des acteurs et des UC    | Conçu      |
-| Priorisation et planification           | Conçu      |
-| Architecture en couches                 | Proposée   |
-| Diagramme de cas d'utilisation          | Conçu      |
-| Diagramme de classes                    | Conçu      |
-| Diagramme de séquence                   | Conçu      |
-| Implémentation de UC2                   | À réaliser |
-| Tests automatisés                       | À réaliser |
-| Pipeline CI/CD                          | À réaliser |
-| Version de démonstration                | À réaliser |
+| Livrable                                                   | État       |
+| ---------------------------------------------------------- | ---------- |
+| Définition de la vision et du périmètre                    | Conçu      |
+| Identification des acteurs et des UC                       | Conçu      |
+| Priorisation et planification                              | Conçu      |
+| Architecture logicielle Angular / NestJS / TypeORM / MySQL | Proposée   |
+| Diagramme de cas d'utilisation                             | Conçu      |
+| Diagramme de classes                                       | Conçu      |
+| Diagramme de séquence                                      | Conçu      |
+| Mise en place du backend NestJS                            | À réaliser |
+| Mise en place du frontend Angular                          | À réaliser |
+| Configuration de TypeORM et MySQL                          | À réaliser |
+| Implémentation de UC2                                      | À réaliser |
+| Tests automatisés                                          | À réaliser |
+| Pipeline CI/CD                                             | À réaliser |
+| Version de démonstration                                   | À réaliser |
 
 ---
 
