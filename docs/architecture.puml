@@ -1,61 +1,80 @@
 
 @startuml
 !theme aws-orange
-left to right direction
+autonumber
 
-skinparam componentStyle rectangle
-skinparam shadowing false
-skinparam packageStyle rectangle
+title Diagramme de séquence - UC2 : Réserver un rendez-vous
 
-title Architecture logicielle - Gestion de rendez-vous médicaux
-
-actor "Patient / Médecin /\nAdministrateur" as User
-
-package "Frontend - Angular" {
-    component "Pages & Components" as Components
-    component "Angular Services" as AngularServices
-    component "Routing & Forms" as AngularUI
-
-    AngularUI --> Components
-    Components --> AngularServices
-}
-
-package "Backend - NestJS" {
-    component "AppointmentsController" as Controller
-    component "AppointmentsService" as Service
-    component "AppointmentRepository" as Repository
-    component "NotificationService" as NotificationService
-
-    Controller --> Service
-    Service --> Repository
-    Service --> NotificationService
-}
-
+actor Patient
+participant "Angular Frontend" as Frontend
+participant "AppointmentsController\n(NestJS)" as Controller
+participant "AppointmentsService\n(NestJS)" as Service
+participant "AppointmentRepository\n(TypeORM)" as Repository
 database "MySQL Database" as DB
+participant "NotificationService" as Notification
+participant "External Notification\nProvider" as Provider
 
-component "TypeORM" as ORM
+Patient -> Frontend : Sélectionner un créneau
+Frontend -> Controller : POST /appointments\n(données du rendez-vous)
+Controller -> Service : reserveAppointment(data)
 
-User --> AngularUI
-AngularServices --> Controller : HTTP / REST API
-Repository --> ORM
-ORM --> DB : SQL
+Service -> Repository : Vérifier et enregistrer\nle rendez-vous
+Repository -> DB : Démarrer une transaction
 
-cloud "External Notification\nProvider" as Provider
-NotificationService --> Provider : API
+Repository -> DB : Vérifier l'existence du créneau
+DB --> Repository : Résultat de la vérification
 
-note right of Service
-  Business rules:
-  - Availability verification
-  - Reservation management
-  - Conflict handling
-  - Cancellation management
+alt Créneau inexistant ou indisponible
+    Repository -> DB : Annuler la transaction
+    Repository --> Service : Réservation refusée
+    Service --> Controller : Erreur métier
+    Controller --> Frontend : HTTP 409 / 404
+    Frontend --> Patient : Afficher un message d'erreur\net proposer d'autres créneaux
+
+else Créneau disponible
+    Repository -> DB : Insérer le rendez-vous\n(contrainte d'unicité)
+    
+    alt Enregistrement réussi
+        DB --> Repository : Insertion réussie
+        Repository -> DB : Valider la transaction
+        Repository --> Service : Rendez-vous enregistré
+
+        Service -> Notification : Envoyer confirmation
+        Notification -> Provider : Appel API de notification
+
+        alt Notification envoyée
+            Provider --> Notification : Confirmation d'envoi
+            Notification --> Service : Notification envoyée
+        else Service externe indisponible
+            Provider --> Notification : Erreur d'envoi
+            Notification -> DB : Enregistrer notification\navec statut PENDING
+            Notification --> Service : Notification à réessayer
+        end
+
+        Service --> Controller : Réservation confirmée
+        Controller --> Frontend : HTTP 201 Created
+        Frontend --> Patient : Afficher la confirmation
+
+    else Conflit ou erreur d'enregistrement
+        DB --> Repository : Erreur SQL
+        Repository -> DB : Annuler la transaction
+        Repository --> Service : Échec de réservation
+        Service --> Controller : Erreur contrôlée
+        Controller --> Frontend : HTTP 409 / 500
+        Frontend --> Patient : Afficher un message d'échec
+    end
+end
+
+note over Repository,DB
+  La transaction et la contrainte d'unicité
+  empêchent les doubles réservations,
+  y compris en cas de requêtes simultanées.
 end note
 
-note bottom of DB
-  Database constraints and
-  transactions protect data
-  consistency and prevent
-  double bookings.
+note over Notification,Provider
+  Une erreur de notification ne doit pas
+  annuler une réservation déjà enregistrée.
+  La notification pourra être réessayée.
 end note
 
 @enduml
