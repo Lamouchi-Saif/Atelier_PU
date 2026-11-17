@@ -286,19 +286,19 @@ Le projet évolue progressivement conformément aux phases et aux itérations du
 
 Les livrables sont considérés comme terminés uniquement après leur réalisation et leur vérification.
 
-| Livrable                                | État                     |
-| --------------------------------------- | ------------------------ |
-| Définition de la vision et du périmètre | Conçu                    |
-| Identification des acteurs et des UC    | Conçu                    |
-| Priorisation et planification           | Conçu                    |
-| Architecture en couches                 | Proposée                 |
-| Diagramme de cas d'utilisation          | À vérifier dans le dépôt |
-| Diagramme de classes                    | À réaliser               |
-| Diagramme de séquence                   | À réaliser               |
-| Implémentation de UC2                   | À réaliser               |
-| Tests automatisés                       | À réaliser               |
-| Pipeline CI/CD                          | À réaliser               |
-| Version de démonstration                | À réaliser               |
+| Livrable                                | État       |
+| --------------------------------------- | ---------- |
+| Définition de la vision et du périmètre | Conçu      |
+| Identification des acteurs et des UC    | Conçu      |
+| Priorisation et planification           | Conçu      |
+| Architecture en couches                 | Proposée   |
+| Diagramme de cas d'utilisation          | Conçu      |
+| Diagramme de classes                    | Conçu      |
+| Diagramme de séquence                   | Conçu      |
+| Implémentation de UC2                   | À réaliser |
+| Tests automatisés                       | À réaliser |
+| Pipeline CI/CD                          | À réaliser |
+| Version de démonstration                | À réaliser |
 
 ---
 
