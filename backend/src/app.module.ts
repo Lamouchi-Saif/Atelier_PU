@@ -6,6 +6,9 @@ import { createObserveModule } from '@nestjs/observe';
 
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { AppointmentsController } from './appointments/contollers/appointments.controller.js';
+import { AppointmentsService } from './appointments/services/appointments.service.js';
+import { AppointmentRepository } from './appointments/repositories/appointment.repository.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -37,7 +40,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       serviceId: 'backend',
     }),
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [AppController, AppointmentsController],
+  providers: [AppService, AppointmentsService, AppointmentRepository],
 })
 export class AppModule {}
